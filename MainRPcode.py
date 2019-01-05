@@ -2,91 +2,116 @@ import webbrowser
 import time
 import requests
 
-api_key = 'AIzaSyCYjLqZeQa0ma3cKzaulANYmWvV8j5CQ9s'
+api_key = 'AIzaSyB23T32B3CyuMJNUD30OA-V7qfCeL8GcUE'
 
 
 def main():
-    """
-    @:return
-    """
+    '''
+    main function which will execute all other functions in program to perform task
+    :input: none
+    :return: none, should generate two web pages (directions to CTA, directions to destination from CTA)
+    '''
     # establishes start end and time data
     query_user()
-    print(destination)
-    print(origin)
-    print(arrivalTime)
-    # create link and queries service which outputs json
-    json_total_routes = link_gen_and_query('filter routes')  # TODO: Steve, what is 'filter routes'?
-    subway_stop_location = sort_routes(json_total_routes)
+    # returns optimal subway stop
+    subway_stop_location = sort_routes()
+    # returns the time you need to arrive at the CTA
     arrival_time_transit = determine_arrival_time(subway_stop_location)
+    # launches directions in google mamps, with two windows for directions to and from CTA
     launch_directions(arrival_time_transit, subway_stop_location)
 
 
 def query_user():
-    """
-    Ask user for details about journey (destination, origin, Date, ETD), as invoked in
-    main function
-    @input: NONE
-    @:return: reference to journey variables
-    """
-    global destination, origin, arrivalTime  # TODO: replace "global" with a pair?
+    global destination, origin, arrival_time
+    '''
+
+    query_user() function has pre-assigned varibales above for testing purposes
+
     destination = input('What is the location of your event?').replace(" ","+")
     origin = input('Where will you be traveling from?').replace(" ","+")
     pattern = '%m.%d.%Y %H:%M'
-    date_time = input('What day and time will the event be? Military Time(MM.DD.YYYY HH:MM)')
-    arrivalTime = int(time.mktime(time.strptime(date_time, pattern)))
+    date_time = input('What day and time will the event be? Militaty Time(MM.DD.YYYY HH:MM)')
+    arrival_time = int(time.mktime(time.strptime(date_time, pattern)))
+    '''
+    arrival_time = 1547235000
+    origin = '41.720055,-87.751211'
+    destination = 'grant park chicago il'
 
 
-def link_gen_and_query(route_type):
-    """
-    Create Google Maps link based on the user input that can then generate a json for the journey.
-    :param route_type: ?
-    :return: json file
-    """
-    # generic start to every link
-    start_link = "https://maps.googleapis.com/maps/api/directions''/json?"
-    if route_type == 'all routes':
-        # Specific end of link including API parameters
-        end_link = "&mode=transit&transit_mode=subway&transit_mode=bus&alternatives=true"
-        # Completion of link which includes  standard start stop and time data
-        final_link = start_link + 'origin=%s&destination=%s&key=%s&arrival_time=%s'%(origin, destination, api_key, str(arrivalTime)) + end_link
-        return requests.get(final_link).json()
+def sort_routes():
+    # returns an array of the closest subway stops by ditance (miles)
+    subway_stop_candidates = nearby_search_request(origin)
+    # next three lines put lat long coordinates into lat,long|lat,long|lat,long... as standard
+    # in the  documentation for the link (see API doc. https://developers.google.com/maps/documentation/distance-matrix/intro)
+    bar_list_format_candidates = ''
+    for x in subway_stop_candidates:
+        bar_list_format_candidates = bar_list_format_candidates + x + '|'
+    # TODO the rest of this function block is the main thing to finish to make functional, you need to
+    # TODO determine the best CTA stop using distance matrix, this partially code already, function returns CTA stop
+    start_link = 'https://maps.googleapis.com/maps/api/distancematrix/json?'
+    parameters = 'origins=%s&destinations=%s&key=%s' % (origin, bar_list_format_candidates, api_key)
+    final_link = start_link + parameters
+    json = requests.get(final_link).json()
+    # json['rows'][]
+    webbrowser.open(final_link)
+
+    '''
+    for x in subway_stop_candidates:
+    start_link = 'https://maps.googleapis.com/maps/api/distancematrix/json?'
+    parameters_drive = 'origins=%s&destinations=%s&key=%s'%(origin,x,api_key)
+    parameters_transit = '&origins=%s&destinations=%s&key=%s'%(x,destination,api_key)
+    '''
+    return subway_location
 
 
-def sort_routes(json):
-    """
-    Steve: what is the objective of this? Still to be developed based on original code?
-    :param json: unused parameter
-    :return:
-    """
-    middle_location = '711+Desplaines+Ave+Forest+Park+IL+60130'  # TODO: generalize this
-    return middle_location
+# this function determines what time the user must arrive in order to catch their train
+def determine_arrival_time(middle_destination):
+    start_link = 'https://maps.googleapis.com/maps/api/directions''/json?'
+    end_link = '&mode=transit&transit_mode=subway'
+    final_link = start_link + 'origin=%s&destination=%s&key=%s&arrival_time=%s' % (
+    origin, middle_destination, api_key, str(arrivalTime),) + end_link
+    # change to directions matrix
+    json_total_routes = requests.get(final_link).json()
+    # determines start time to get to destination and then adds 5 minute (300 sec) buffer, this is in unix form
+    buffer_time = 300
+    arrival_ime_transit = json_total_routes['routes'][0]['legs'][0]['departure_time']['value'] - buffer_time
+    return arrival_ime_transit
 
 
-def determine_arrival_time(middleDestination):
-    """
-    Use route information within json and transfer "station" to understand when user will arrive at destination
-    TODO: replace static buffer with an input from user (e.g. my mom needs 10 minutes, versus my dad 1 minute)
-    :param middleDestination:
-    :return: Arrive time (Military time)
-    """
-    StartLink = 'https://maps.googleapis.com/maps/api/directions''/json?'
-    EndLink = '&mode=transit&transit_mode=subway'
-    FinalLink = StartLink + 'origin=%s&destination=%s&key=%s&arrival_time=%s' % (origin, middleDestination, api_key, str(arrivalTime),) + EndLink
-    jsonTotalRoutes = requests.get(FinalLink).json()
-    buffer_time = 300  # number of seconds as buffer to required departure time to reach destination
-    # Determines start time to get to destination and then adds buffer, this is in unix form
-    arrivalTimeTransit = jsonTotalRoutes['routes'][0]['legs'][0]['departure_time']['value'] - buffer_time
-    return arrivalTimeTransit
+# this function will launch the directions for the most preferred path
+def launch_directions(arrival_time_transit, subway_stop_location):
+    # API for web browser generation https://developers.google.com/maps/documentation/urls/guide
+    start_link = 'https://www.google.com/maps/dir/?api=1&'
+    driving_link = start_link + 'origin=%s&destination=%s&travelmode=driving' % (origin, subway_stop_location)
+    transit_link = start_link + 'origin=%s&destination=%s&travelmode=transit' % (subway_stop_location, destination)
+    # this is the time 5 minutes before the estimated start time of the transit
+    # currently not able to input in web browser (yes so its useless at the moment)
+    print(arrival_time_transit)
+    # generates window but does not contain the correct time
+    webbrowser.open(driving_link)
+    webbrowser.open(transit_link)
 
 
-def launch_directions(aTT, sSL):
-    startLink = 'https://www.google.com/maps/dir/?api=1&'
-    drivinglink = startLink + 'origin=%s&destination=%s&travelmode=driving' % (origin, sSL)
-    transitlink = startLink + 'origin=%s&destination=%s&travelmode=transit' % (sSL, destination)
-    #this is the time 5 minutes before the estimated start time of the transit
-    print(aTT)
-    #Generates window but does not contain the correct time
-    webbrowser.open(drivinglink)
-    webbrowser.open(transitlink)
+# documentation for API @ https://developers.google.com/places/web-service/search
+def nearby_search_request(location):
+    start_link = 'https://maps.googleapis.com/maps/api/place/nearbysearch/json?'
+    # (straight from documentation) A term to be matched against all content that Google has indexed for this place
+    # including but not limited to name, type, and address, as well as customer reviews and other third-party content.
+    keyword = 'CTA'
+    # consider using name instead?
+    # this is the area to be searched which must be specified in lat/long
+    transit_type = 'subway_station'
+    parameters = 'key=%s&location=%s&keyword=%s&type=%s&rankby=distance' % (api_key, location, keyword, transit_type)
+    final_link = start_link + parameters
+    # print (final_link)
+    # webbrowser.open(final_link)
+    json = requests.get(final_link).json()
+    lat_long_array = []
+    for x in json['results']:
+        lat_long_array.append(str(x["geometry"]["location"]['lat']) + ',' + str(x["geometry"]["location"]['lng']))
+        # consider breaking after say 5 iterations? aka only check top 5
+        break
+    return lat_long_array
+
 
 main()
