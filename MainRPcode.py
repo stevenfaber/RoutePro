@@ -14,11 +14,11 @@ def main():
     # establishes start end and time data
     query_user()
     # returns optimal subway stop
-    subway_stop_location = sort_routes()
+    subway_stop_location = determine_optimal_CTA()
     # returns the time you need to arrive at the CTA
     arrival_time_transit = determine_arrival_time(subway_stop_location)
     # launches directions in google maps, with two windows for directions to and from CTA
-    launch_directions(arrival_time_transit, subway_stop_location)
+    # launch_directions(arrival_time_transit, subway_stop_location)
 
 
 def query_user():
@@ -43,10 +43,10 @@ def query_user():
     """
 
 
-def sort_routes():
+def determine_optimal_CTA():
     """
 
-    :return: an array of the closest subway stops by distance (miles)
+    :return: CTA stop which will optmize for travel time
     """
 
     subway_stop_candidates = nearby_search_request(origin)
@@ -56,15 +56,26 @@ def sort_routes():
     bar_list_format_candidates = ''
     for x in subway_stop_candidates:
         bar_list_format_candidates = bar_list_format_candidates + x + '|'
-    # TODO the rest of this function block is the main thing to finish to make functional, you need to
-    # TODO determine the best CTA stop using distance matrix, this partially code already, function returns CTA stop
+    # TODO the rest of this function block is the main thing to finish. To make functional, you need to
+    # TODO determine the best CTA stop using distance matrix. This is partially code already. function returns CTA stop
     start_link = 'https://maps.googleapis.com/maps/api/distancematrix/json?'
-    parameters = 'origins=%s&destinations=%s&key=%s' % (origin, bar_list_format_candidates, api_key)
-    final_link = start_link + parameters
-    json = requests.get(final_link).json()
-    # json['rows'][]
-    webbrowser.open(final_link)
-
+    parameters_drive = 'origins=%s&destinations=%s&key=%s' % (origin, bar_list_format_candidates, api_key)
+    final_link_drive = start_link + parameters_drive
+    parameters_CTA = 'origins=%s&destinations=%s&key=%s' % (bar_list_format_candidates,destination, api_key)
+    final_link_CTA = start_link + parameters_CTA
+    json_drive = requests.get(final_link_drive).json()
+    json_CTA = requests.get(final_link_CTA).json()
+    #webbrowser.open(final_link_CTA)
+    total_candidate_commute_time = []
+    y = json_CTA['rows'][0]['elements']
+    i = 0
+    print(json_CTA)
+    quit()
+    for x in json_drive['rows'][0]['elements']:
+        # TODO: double for loop
+        total_candidate_commute_time.append(x['duration']['value'] + y[i]['duration']['value'])
+        i += 1
+    print(total_candidate_commute_time)
     '''
     for x in subway_stop_candidates:
         start_link = 'https://maps.googleapis.com/maps/api/distancematrix/json?'
@@ -85,7 +96,7 @@ def determine_arrival_time(middle_destination):
     start_link = 'https://maps.googleapis.com/maps/api/directions''/json?'
     end_link = '&mode=transit&transit_mode=subway'
     final_link = start_link + 'origin=%s&destination=%s&key=%s&arrival_time=%s' % (
-    origin, middle_destination, api_key, str(arrivalTime),) + end_link
+    origin, middle_destination, api_key, str(arrival_time),) + end_link
     # change to directions matrix
     json_total_routes = requests.get(final_link).json()
     # determines start time to get to destination and then adds 5 minute (300 sec) buffer, this is in unix form
@@ -135,7 +146,6 @@ def nearby_search_request(location):
     for x in json['results']:
         lat_long_array.append(str(x["geometry"]["location"]['lat']) + ',' + str(x["geometry"]["location"]['lng']))
         # consider breaking after say 5 iterations? aka only check top 5
-        break
     return lat_long_array
 
 
